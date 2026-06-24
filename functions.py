@@ -64,6 +64,9 @@ def normalize(df):
     bs_13 = df.loc[df.len_us == 13].copy() # prefixo br-OOH
     bs_15 = df.loc[df.len_us == 15].copy() # prefixo br-OOH
 
+    
+    bs_8['UserPS'] = pd.to_numeric(bs_8['UserPS'], errors='coerce')
+    print(bs_8['UserPS'].dtype)
     bs_8.loc[(bs_8.len_us == 8), 'UserPS'] = (bs_8.UserPS.astype(int) - 55000000) + 550000000
 
     mask = ~(bs_14['Prefijo'].isin(['OOH']))
@@ -98,7 +101,7 @@ def normalize(df):
 def atualizar_base(df,inicio,fim):
     from datetime import datetime
     import pandas as pd
-    path = 'C:/Users/70089581/Kantar/BKO - dados-ops/do_rep7/'
+    path = 'C:/Users/luiz.farias/Numerator International/BKO - projeto-dados-ops/do_rep7/'
     # 1. Pegar apenas o mês mais recente
     # mes_recente = df['mes_ref'].max()
     inicio_fmt = pd.to_datetime(inicio)
@@ -113,7 +116,7 @@ def atualizar_base(df,inicio,fim):
     return df
 
 def atualizar_prealoc_atos(prealoc,mes_recente):
-    path = "c:/Users/70089581/Kantar/BKO - dados-ops/do_prealoc_atos/"
+    path = "C:/Users/luiz.farias/Numerator International/BKO - projeto-dados-ops/do_prealoc_atos/"
     merged = prealoc.merge(mes_recente, on='UserPS', how='inner')
 
     merged.UserPS = merged.UserPS.astype(int)
@@ -136,7 +139,7 @@ def atualizar_prealoc_atos(prealoc,mes_recente):
     path
 
 def atualizar_base_criterio(prealoc,rep7):
-    path = "c:/Users/70089581/Kantar/BKO - dados-ops/do_base_criterio/"
+    path = "C:/Users/luiz.farias/Numerator International/BKO - projeto-dados-ops/do_base_criterio/"
 
     merged = prealoc.merge(rep7, on='UserPS', how='inner')
 
