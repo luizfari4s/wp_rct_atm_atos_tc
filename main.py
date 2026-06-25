@@ -8,8 +8,6 @@ def main():
         path='C:/Users/luiz.farias/Numerator International/BKO - projeto-dados-ops/do_preal_fornecedor/ref_prealoc',
         prefixo='pre'
     )
-
-    pre_aloc.shape
     
     trocas = {
     '{GroupId}' : 'UserPS',
@@ -34,6 +32,7 @@ def main():
         prefixo='Brasil-Reporte-7'
     )
     rep7 = functions.normalize(rep7)
+    rep7_nf = rep7.copy()
 
     rep7, inicio, fim = functions.filtrar_periodo_vigente(
         rep7, 
@@ -41,9 +40,9 @@ def main():
         coluna_data='DiaDeCompra'
     )
 
-    
+    out = functions.inf_consolidada(rep7_nf,df_cldar,pre_aloc)
 
-
+    functions.atualizar_consolidado(out)
 
     functions.atualizar_base(rep7, inicio, fim)
 
@@ -52,24 +51,22 @@ def main():
 
     functions.atualizar_prealoc_atos(pre_aloc,rep7)
 
-    '''# Disparo Top Client
+    # Disparo Top Client
     tc = 'Arthurribeiro@orbitustech.com; viniciusoliveira@orbitustech.com; landing-worldpanel@orbitustech.com; talita.cesar@wp.numerator.com; brenno.todao@topclient.com.br'
     subject = 'Relatório Atos Brutos Top Client'
-    path = functions.pegar_arquivo_mais_recente('C:/Users/luiz.farias/Numerator International/BKO - projeto-dados-ops/do_prealoc_atos', extensao=None)
+    path = functions.pegar_arquivo_mais_recente('c:/Users/luiz.farias/Numerator International/BKO - projeto-dados-ops/do_prealoc_atos', extensao=None)
     time.sleep(10)
     functions.disparar_email(path, tc, subject)
     
-    time.sleep(60)
+    time.sleep(20)
     
     # Disparo Interno IHS
     interno = 'Marilia.Santana@wp.numerator.com; talita.cesar@wp.numerator.com; Josane.Tonello@wp.numerator.com'
     subject_2 = 'Relatório Critério de Atos'
-    path_2 = functions.pegar_arquivo_mais_recente('C:/Users/luiz.farias/Numerator International/BKO - projeto-dados-ops/do_base_criterio', extensao=None)
-    time.sleep(60)
+    path_2 = functions.pegar_arquivo_mais_recente('c:/Users/luiz.farias/Numerator International/BKO - projeto-dados-ops/do_base_criterio', extensao=None)
+    time.sleep(10)
 
     functions.disparar_email(path_2, interno, subject_2)
-
-    time.sleep(60)'''
 
 if __name__ == '__main__':  
     main() 

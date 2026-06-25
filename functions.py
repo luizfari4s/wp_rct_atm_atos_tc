@@ -1,16 +1,18 @@
-def carregamento(prefixo, path):
+def carregamento(prefixo, path, fluxo_externo=False):
     import pandas as pd
     import glob
     import os
 
-    # Busca CSV e Excel
-    arquivos = glob.glob(os.path.join(path, f"{prefixo}*.csv")) + \
-               glob.glob(os.path.join(path, f"{prefixo}*.xlsx")) + \
-               glob.glob(os.path.join(path, f"{prefixo}*.xls"))
+    arquivos = (
+        glob.glob(os.path.join(path, f"{prefixo}*.csv"))
+        + glob.glob(os.path.join(path, f"{prefixo}*.xlsx"))
+        + glob.glob(os.path.join(path, f"{prefixo}*.xls"))
+    )
 
     dfs = []
 
     for arq in arquivos:
+
         extensao = os.path.splitext(arq)[1].lower()
 
         if extensao == ".csv":
@@ -20,7 +22,10 @@ def carregamento(prefixo, path):
             df = pd.read_excel(arq)
 
         else:
-            continue  # ignora formatos desconhecidos
+            continue
+
+        # Sempre guarda a origem
+        df['arquivo_origem'] = os.path.basename(arq)
 
         dfs.append(df)
 
@@ -29,20 +34,20 @@ def carregamento(prefixo, path):
 
     df_final = pd.concat(dfs, ignore_index=True)
 
-     
-
-    
+    # Remove apenas no fluxo externo
+    if fluxo_externo:
+        df_final.drop(columns='arquivo_origem', inplace=True)
 
     return df_final
 
 def normalize(df):
     import pandas as pd
-    print('\n')
+    
 
     print("Entrada da função de normalização")
     print("Menor data encontrada:", df['DiaDeCompra'].min(),' | ', "Maior data encontrada:", df['DiaDeCompra'].max())
 
-    print('\n')
+    
 
     shape_init = df.shape[0]
     df.DiaDeCompra = pd.to_datetime(df.DiaDeCompra, format='%d/%m/%Y')
@@ -64,10 +69,7 @@ def normalize(df):
     bs_13 = df.loc[df.len_us == 13].copy() # prefixo br-OOH
     bs_15 = df.loc[df.len_us == 15].copy() # prefixo br-OOH
 
-    
-    bs_8['UserPS'] = pd.to_numeric(bs_8['UserPS'], errors='coerce')
-    print(bs_8['UserPS'].dtype)
-    bs_8.loc[(bs_8.len_us == 8), 'UserPS'] = (bs_8.UserPS.astype(int) - 55000000) + 550000000
+    bs_8.loc[(bs_8.len_us == 8), 'UserPS'] = str((bs_8.UserPS.astype(int) - 55000000) + 550000000)
 
     mask = ~(bs_14['Prefijo'].isin(['OOH']))
 
@@ -116,7 +118,7 @@ def atualizar_base(df,inicio,fim):
     return df
 
 def atualizar_prealoc_atos(prealoc,mes_recente):
-    path = "C:/Users/luiz.farias/Numerator International/BKO - projeto-dados-ops/do_prealoc_atos/"
+    path = "c:/Users/luiz.farias/Numerator International/BKO - projeto-dados-ops/do_prealoc_atos/"
     merged = prealoc.merge(mes_recente, on='UserPS', how='inner')
 
     merged.UserPS = merged.UserPS.astype(int)
@@ -128,7 +130,7 @@ def atualizar_prealoc_atos(prealoc,mes_recente):
 
     data_atual = datetime.now().strftime("%Y%m%d")
 
-    merged.drop(columns='Unnamed: 9',inplace=True)
+    #merged.drop(columns='Unnamed: 9',inplace=True)
     arquivo_saida = path + f'do_prealoc_atos_{data_atual}.xlsx'
     merged.to_excel(arquivo_saida, index=False)
 
@@ -139,7 +141,7 @@ def atualizar_prealoc_atos(prealoc,mes_recente):
     path
 
 def atualizar_base_criterio(prealoc,rep7):
-    path = "C:/Users/luiz.farias/Numerator International/BKO - projeto-dados-ops/do_base_criterio/"
+    path = "c:/Users/luiz.farias/Numerator International/BKO - projeto-dados-ops/do_base_criterio/"
 
     merged = prealoc.merge(rep7, on='UserPS', how='inner')
 
@@ -337,3 +339,129 @@ def filtrar_periodo_vigente(
     print('\n\n')
 
     return df_filtrado, inicio, fim
+
+def inf_consolidada(rep_7_nf, df_cldar, pre_aloc):
+    import pandas as pd
+    from datetime import datetime
+
+
+    # =========================
+    # 1. Preparação
+    # =========================
+
+    rep_7_nf['DiaDeCompra'] = pd.to_datetime(rep_7_nf['DiaDeCompra'])
+    df_cldar['Desde'] = pd.to_datetime(df_cldar['Desde'])
+    df_cldar['Hasta'] = pd.to_datetime(df_cldar['Hasta'])
+
+    pre_aloc['UserPS'] = pre_aloc['UserPS'].astype(str)
+    rep_7_nf['UserPS'] = rep_7_nf['UserPS'].astype(str)
+
+    df_periodos = df_cldar.copy()
+    df_periodos['MesProdutivo'] = df_periodos['Hasta'].dt.strftime('%Y-%m')
+
+    # =========================
+    # 2. Base ID x Período
+    # =========================
+
+    ids_periodos = pre_aloc[['UserPS']].drop_duplicates().merge(
+        df_periodos[['MesProdutivo', 'Desde', 'Hasta']],
+        how='cross'
+    )
+
+    # =========================
+    # 3. Transmissões com período
+    # =========================
+
+    base_com_periodo = rep_7_nf.merge(
+        df_periodos[['MesProdutivo', 'Desde', 'Hasta']],
+        how='cross'
+    )
+
+    base_com_periodo = base_com_periodo.loc[
+        (base_com_periodo['DiaDeCompra'] >= base_com_periodo['Desde']) &
+        (base_com_periodo['DiaDeCompra'] <= base_com_periodo['Hasta'])
+    ].copy()
+
+    # =========================
+    # 4. Agregado por ID e período
+    # =========================
+
+    transmissao_por_periodo = (
+        base_com_periodo
+        .groupby(['UserPS', 'MesProdutivo'], as_index=False)
+        .agg(
+            qtd_transmissions=('DiaDeCompra', 'count'),
+            primeira_transmissao=('DiaDeCompra', 'min'),
+            ultima_transmissao=('DiaDeCompra', 'max'),
+            NumCompras=('NumCompras', 'sum')
+        )
+    )
+
+    # =========================
+    # 5. Enriquecer ID x período
+    # =========================
+
+    out = ids_periodos.merge(
+        transmissao_por_periodo,
+        on=['UserPS', 'MesProdutivo'],
+        how='left'
+    )
+
+    # =========================
+    # 6. Trazer colunas originais do pre_aloc
+    # =========================
+
+    out = out.merge(
+        pre_aloc,
+        on='UserPS',
+        how='left'
+    )
+
+    # =========================
+    # 7. Faixa de compras
+    # =========================
+
+    bins = [0, 4, 9, 14, 19, 24, float('inf')]
+    labels = [
+        '1 a 4 atos',
+        '5 a 9 atos',
+        '10 a 14 atos',
+        '15 a 19 atos',
+        '20 a 24 atos',
+        '25+ atos'
+    ]
+
+    out['FaixaNumCompras'] = pd.cut(
+        out['NumCompras'],
+        bins=bins,
+        labels=labels,
+        right=True
+    )
+
+    return out 
+
+def atualizar_consolidado(cons):
+    import pandas as pd
+    from pathlib import Path
+    from datetime import datetime
+    path = Path('C:/Users/luiz.farias/Numerator International/BKO - projeto-dados-ops/do_preal_fornecedor/ref_cosolidado')
+
+    arquivo_historico = path / 'consolidado_ids_tc_rep7_historico.xlsx' 
+
+    # cons_nw é o out que você acabou de gerar no script atual
+    cons_nw = cons.copy()
+
+    cons_nw['data_atualizacao'] = datetime.now()
+
+    chave = ['UserPS', 'MesProdutivo']
+
+    base_atualizada = cons_nw.copy()
+    base_atualizada.UserPS = base_atualizada.UserPS.astype(int)
+
+    base_atualizada.to_excel(
+        arquivo_historico,
+        index=False
+    )
+
+
+
