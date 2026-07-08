@@ -100,25 +100,25 @@ def normalize(df):
 
     return df
 
-def atualizar_base(df,inicio,fim):
+def atualizar_base(df,inicio,fim, path_rep7):
     from datetime import datetime
     import pandas as pd
-    path = 'C:/Users/luiz.farias/Numerator International/BKO - projeto-dados-ops/do_rep7/'
+    
     # 1. Pegar apenas o mês mais recente
     # mes_recente = df['mes_ref'].max()
     inicio_fmt = pd.to_datetime(inicio)
     fim_fmt = pd.to_datetime(fim)
     
    
-    arquivo_saida = path + f'do_rep7_pstools_br_{inicio_fmt.date()}_a_{fim_fmt.date()}.xlsx'
+    arquivo_saida = path_rep7 + f'do_rep7_pstools_br_{inicio_fmt.date()}_a_{fim_fmt.date()}.xlsx'
     df.to_excel(arquivo_saida)
     print(f'Arquivo salvo em: {arquivo_saida}')
 
     print(f"atualizar_base: Arquivo Excel criado com sucesso! Salvo na pasta sincronizada do SharePoint \n")
     return df
 
-def atualizar_prealoc_atos(prealoc,mes_recente):
-    path = "c:/Users/luiz.farias/Numerator International/BKO - projeto-dados-ops/do_prealoc_atos/"
+def atualizar_prealoc_atos(prealoc,mes_recente, path_prealoc_atos):
+    
     merged = prealoc.merge(mes_recente, on='UserPS', how='inner')
 
     merged.UserPS = merged.UserPS.astype(int)
@@ -131,17 +131,15 @@ def atualizar_prealoc_atos(prealoc,mes_recente):
     data_atual = datetime.now().strftime("%Y%m%d")
 
     #merged.drop(columns='Unnamed: 9',inplace=True)
-    arquivo_saida = path + f'do_prealoc_atos_{data_atual}.xlsx'
+    arquivo_saida = path_prealoc_atos + f'do_prealoc_atos_{data_atual}.xlsx'
     merged.to_excel(arquivo_saida, index=False)
 
     print(f'Arquivo salvo em: {arquivo_saida}')
 
     print(f"atualizar_prealoc_atos: Arquivo Excel criado com sucesso! Salvo na pasta sincronizada do SharePoint \n")
 
-    path
 
-def atualizar_base_criterio(prealoc,rep7):
-    path = "c:/Users/luiz.farias/Numerator International/BKO - projeto-dados-ops/do_base_criterio/"
+def atualizar_base_criterio(prealoc,rep7, path_base_criterio):
 
     merged = prealoc.merge(rep7, on='UserPS', how='inner')
 
@@ -157,7 +155,7 @@ def atualizar_base_criterio(prealoc,rep7):
     df_grouped, df_dist = faixa_de_atos(merged.copy())
 
     # Nome do arquivo
-    arquivo_saida = path + f'do_base_criterio_{data_atual}.xlsx'
+    arquivo_saida = path_base_criterio + f'do_base_criterio_{data_atual}.xlsx'
     import pandas as pd
     # Salvando os dois DataFrames em abas diferentes do mesmo Excel
     with pd.ExcelWriter(arquivo_saida, engine='openpyxl') as writer:
@@ -174,7 +172,7 @@ def faixa_de_atos(df):
     df.UserPS = df.UserPS.astype(int)
     # print("step 5 - (Faixa de atos) Colunas: ", df.columns, "\n")
 
-    df_grouped = df.groupby(['UserPS', 'Origen_GPM'])['NumCompras'].sum().reset_index().sort_values(by='NumCompras', ascending=False)
+    df_grouped = df.groupby(['UserPS', 'created_at','Origen_GPM'])['NumCompras'].sum().reset_index().sort_values(by='NumCompras', ascending=False)
 
     import pandas as pd
 
@@ -228,7 +226,7 @@ def pegar_arquivo_mais_recente(pasta, extensao=None):
     
     return arquivo_mais_recente
 
-def disparar_email(path, str, subject):
+def disparar_email(path, dest, subject):
 
     import win32com.client as win32
     from datetime import datetime
@@ -243,8 +241,8 @@ def disparar_email(path, str, subject):
     outlook = win32.Dispatch('outlook.application')
     mail = outlook.CreateItem(0)
 
-    mail.To = str
-    mail.CC = 'fabio.shiraishi@wp.numerator.com; luiz.farias@wp.numerator.com' 
+    mail.To = dest
+    mail.CC = 'luiz.farias@wp.numerator.com' 
     
     mail.Subject = f'{subject} | {data_atual}'
     mail.Body = 'Segue em anexo.'
@@ -440,11 +438,11 @@ def inf_consolidada(rep_7_nf, df_cldar, pre_aloc):
 
     return out 
 
-def atualizar_consolidado(cons):
+def atualizar_consolidado(cons, path_cons):
     import pandas as pd
     from pathlib import Path
     from datetime import datetime
-    path = Path('C:/Users/luiz.farias/Numerator International/BKO - projeto-dados-ops/do_preal_fornecedor/ref_cosolidado')
+    path = Path(path_cons)
 
     arquivo_historico = path / 'consolidado_ids_tc_rep7_historico.xlsx' 
 
